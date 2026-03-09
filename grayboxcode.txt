@@ -1,0 +1,57 @@
+      <!-- ROOM SHELL -->
+<a-entity id="room" position="0 0 0">
+
+  <!-- Floor -->
+  <a-plane
+    id="floor"
+    rotation="-90 0 0"
+    width="5"
+    height="6"
+    color="#444"
+    position="0 0 0"
+  ></a-plane>
+
+  <!-- Ceiling -->
+  <a-plane
+    rotation="90 0 0"
+    width="5"
+    height="6"
+    color="#666"
+    position="0 3.4 0"
+  ></a-plane>
+
+  <!-- Back wall -->
+  <a-box
+  width="5"
+  height="3.4"
+  depth="0.1"
+  color="#555"
+  position="0 1.7 -3"
+></a-box>
+
+  <!-- Front wall -->
+  <a-box
+  width="5"
+  height="3.4"
+  depth="0.1"
+  color="#555"
+  position="0 1.7 3"
+></a-box>
+
+  <!-- Left wall -->
+  <a-box
+  width="0.1"
+  height="3.4"
+  depth="6"
+  color="#5a5a5a"
+  position="-2.5 1.7 0"
+></a-box>
+
+  <!-- Right wall -->
+  <a-box
+  width="0.1"
+  height="3.4"
+  depth="6"
+  color="#5a5a5a"
+  position="2.5 1.7 0"
+></a-box>

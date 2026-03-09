@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>The Work Desk</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <a-scene
+      renderer="colorManagement: true; physicallyCorrectLights: true"
+      shadow="type: pcfsoft"
+    >
+    <a-assets>
+  <a-asset-item id="roomModel" src="assets/models/AFRAME_TRIAL.glb"></a-asset-item>
+</a-assets>
+    <a-sky color="#d6d6d6"></a-sky>
+
+
+      <!-- Camera -->
+<a-entity
+  id="rig"
+  position="1 0 2"
+  room-bounds="halfWidth: 2.5; halfDepth: 3; margin: 0.35"
+  wasd-controls="acceleration: 5; fly: false"
+>
+  <a-entity id="head" position="0 1.5 0" look-controls="pointerLockEnabled: true" sync-yaw-to-rig>
+    <a-entity id="camera" camera></a-entity>
+  </a-entity>
+</a-entity>
+
+<a-entity
+  gltf-model="#roomModel"
+  position="0 0 0"
+  rotation="0 90 0"
+  scale="1 1 1"
+></a-entity>
+
+
+</a-entity>
+
+      <!-- Temporary light -->
+      <a-light
+        type="ambient"
+        color="#8899aa"
+        intensity="2"
+      ></a-light>
+
+      <a-light
+        type="point"
+        color="#ffccaa"
+        intensity="5"
+        position="0 2 0"
+      ></a-light>
+
+    </a-scene>
+
+    <script src="js/main.js"></script>
+  </body>
+</html>
