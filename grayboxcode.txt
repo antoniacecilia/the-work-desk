@@ -49,9 +49,11 @@
 
   <!-- Right wall -->
   <a-box
-  width="0.1"
-  height="3.4"
-  depth="6"
-  color="#5a5a5a"
-  position="2.5 1.7 0"
-></a-box>
+    width="0.1"
+    height="3.4"
+    depth="6"
+    color="#5a5a5a"
+    position="2.5 1.7 0"
+  ></a-box>
+
+</a-entity>

@@ -1,0 +1,12 @@
+{
+  "name": "the-work-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A-Frame teaching scene — no build step, served as static files.",
+  "scripts": {
+    "dev": "live-server --port=3000"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}

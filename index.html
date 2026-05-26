@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <title>The Work Desk</title>
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <link rel="stylesheet" href="style.css" />
+    <!-- Loaded in <head> with `defer` so custom components register before <a-scene> initializes. -->
+    <script src="js/main.js" defer></script>
   </head>
 
   <body>
@@ -12,50 +13,106 @@
       renderer="colorManagement: true; physicallyCorrectLights: true"
       shadow="type: pcfsoft"
     >
-    <a-assets>
-  <a-asset-item id="roomModel" src="assets/models/AFRAME_TRIAL.glb"></a-asset-item>
-</a-assets>
-    <a-sky color="#d6d6d6"></a-sky>
+      <a-assets>
+        <a-asset-item id="roomModel" src="assets/models/Room_blockoutglb.glb"></a-asset-item>
+      </a-assets>
 
+      <!-- Night sky — visible through the windows, sets the exterior colour for the evening mood. -->
+      <a-sky color="#08111f"></a-sky>
 
-      <!-- Camera -->
-<a-entity
-  id="rig"
-  position="1 0 2"
-  room-bounds="halfWidth: 2.5; halfDepth: 3; margin: 0.35"
-  wasd-controls="acceleration: 5; fly: false"
->
-  <a-entity id="head" position="0 1.5 0" look-controls="pointerLockEnabled: true" sync-yaw-to-rig>
-    <a-entity id="camera" camera></a-entity>
-  </a-entity>
-</a-entity>
+      <!-- Moon: flat-shaded white sphere placed along the same world-space ray as the directional
+           light (light is at (-5, 5, 1); moon sits further out along that vector at ~3× distance)
+           so the light streaming into the room visually appears to come from it. -->
+      <a-sphere
+        id="moon"
+        position="-15 15 3"
+        radius="1.2"
+        material="shader: flat; color: #ffffff"
+      ></a-sphere>
 
-<a-entity
-  gltf-model="#roomModel"
-  position="0 0 0"
-  rotation="0 90 0"
-  scale="1 1 1"
-></a-entity>
+      <!-- Camera rig: WASD on the body, look-controls on the head, controllers as siblings of the head so they translate with the rig. -->
+      <a-entity
+        id="rig"
+        position="1 0 2"
+        room-bounds="halfWidth: 2.5; halfDepth: 3; margin: 0.35"
+        wasd-controls="acceleration: 5; fly: false"
+      >
+        <a-entity id="head" position="0 1.5 0" look-controls="pointerLockEnabled: true" sync-yaw-to-rig>
+          <a-entity id="camera" camera></a-entity>
+        </a-entity>
 
+        <!-- VR controllers. `laser-controls` auto-loads the right driver (Oculus Touch, Vive, WMR, etc.) and adds a raycaster. -->
+        <a-entity id="leftHand" laser-controls="hand: left"></a-entity>
+        <a-entity id="rightHand" laser-controls="hand: right"></a-entity>
+      </a-entity>
 
-</a-entity>
+      <!-- Room model. `gltf-shadows` flips shadowSide to DoubleSide on every material
+           so single-layer walls cast shadows from either side. -->
+      <a-entity
+        gltf-model="#roomModel"
+        position="0 0 0"
+        rotation="0 90 0"
+        scale="1 1 1"
+        gltf-shadows
+      ></a-entity>
 
-      <!-- Temporary light -->
+      <!-- Fill light: soft ambient so shadow interiors aren't pure black. -->
+      <a-light type="ambient" color="#a7c0d9" intensity="1"></a-light>
+
+      <!-- Key light: directional "sun" slanting through the windows.
+           Windows face -X in world space (Blender's glTF exporter sends Blender +Y → glTF -Z, then
+           entity rotation 0 90 0 sends -Z → -X). Light position is on the -X side so it shines inward.
+           Direction = (target - position); default target is origin, so the light travels +X and -Y.
+           Shadow camera is an ortho box sized to the room; bias tuned for thin single-sided walls. -->
       <a-light
-        type="ambient"
-        color="#8899aa"
-        intensity="2"
+        type="directional"
+        color="#7d9dc7"
+        intensity="10"
+        position="-5 5 1"
+        light="castShadow: true;
+               shadowMapWidth: 2048;
+               shadowMapHeight: 2048;
+               shadowCameraLeft: -6;
+               shadowCameraRight: 6;
+               shadowCameraTop: 6;
+               shadowCameraBottom: -6;
+               shadowCameraNear: 0.1;
+               shadowCameraFar: 20;
+               shadowBias: -0.0005"
       ></a-light>
 
-      <a-light
-        type="point"
-        color="#ffccaa"
-        intensity="5"
-        position="0 2 0"
-      ></a-light>
-
+      <!-- Placeholder floor lamp: foot + pole + emissive bulb, with the point light coincident with the bulb.
+           Whole lamp is grouped under one entity so moving the parent translates everything together. -->
+      <a-entity id="floor-lamp" position="0 0 2.4">
+        <!-- Foot: short wide disc on the floor. -->
+        <a-cylinder
+          radius="0.15"
+          height="0.03"
+          position="0 0.015 0"
+          material="color: #111"
+        ></a-cylinder>
+        <!-- Pole: slim cylinder from foot to bulb. -->
+        <a-cylinder
+          radius="0.015"
+          height="1.7"
+          position="0 0.85 0"
+          material="color: #111"
+        ></a-cylinder>
+        <!-- Bulb: emissive sphere so it visually glows independent of lighting. -->
+        <a-sphere
+          radius="0.07"
+          position="0 1.7 0"
+          material="color: #ffc488; emissive: #ffc488; emissiveIntensity: 1.5"
+        ></a-sphere>
+        <!-- Point light coincident with the bulb. -->
+        <a-light
+          type="point"
+          color="#ffc488"
+          intensity="4"
+          position="0 1.7 0"
+          light="distance: 5; decay: 2"
+        ></a-light>
+      </a-entity>
     </a-scene>
-
-    <script src="js/main.js"></script>
   </body>
 </html>
