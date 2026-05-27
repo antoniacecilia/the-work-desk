@@ -1,3 +1,10 @@
+import AFRAME from 'aframe';
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
 console.log("The Work Desk initialized");
 
 // Clamps the rig's X/Z position so the camera can't walk through the room walls.
@@ -19,7 +26,7 @@ AFRAME.registerComponent("room-bounds", {
   }
 });
 
-// Enables shadow casting/receiving on every mesh inside a loaded GLB, and forces both
+// Enables shadow casting on every mesh inside a loaded GLB, and forces both
 // material.side and material.shadowSide to DoubleSide. The render-side flip lets us see
 // single-sided walls/lamp pieces from any angle; the shadow-side flip is what makes them
 // cast shadows regardless of which face the light hits — required when the model isn't
@@ -75,6 +82,104 @@ AFRAME.registerComponent("shadow-normal-bias", {
   apply: function () {
     const light = this.el.components.light && this.el.components.light.light;
     if (light && light.shadow) light.shadow.normalBias = this.data;
+  }
+});
+
+// UnrealBloom postprocessing — vendored from A-Frame 1.7's official example at
+// https://github.com/aframevr/aframe/blob/v1.7.0/examples/showcase/post-processing/bloom.js
+// Works in both flat and WebXR rendering modes thanks to A-Frame 1.7's renderer plumbing
+// (HalfFloat render targets, multisampling). Uses HDR linear-space thresholding, so the
+// `threshold` value (default 1) is in linear units before tone-mapping, not in 0-1 LDR.
+AFRAME.registerComponent('bloom', {
+  schema: {
+    enabled: { type: 'boolean', default: true },
+    threshold: { type: 'number', default: 1 },
+    strength: { type: 'number', default: 0.5 },
+    radius: { type: 'number', default: 1 }
+  },
+  events: {
+    rendererresize: function () {
+      this.renderer.getSize(this.size);
+      this.composer.setSize(this.size.width, this.size.height);
+    }
+  },
+  init: function () {
+    this.size = new THREE.Vector2();
+    this.scene = this.el.object3D;
+    this.renderer = this.el.renderer;
+    this.camera = this.el.camera;
+    this.originalRender = this.el.renderer.render;
+    this.bind();
+  },
+  update: function (oldData) {
+    if (oldData.enabled === false && this.data.enabled === true) {
+      this.bind();
+    }
+
+    if (oldData.enabled === true && this.data.enabled === false) {
+      this.el.renderer.render = this.originalRender;
+    }
+
+    if (this.composer) {
+      this.composer.dispose();
+    }
+    // create composer with multisampling to avoid aliasing
+    var resolution = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    var renderTarget = new THREE.WebGLRenderTarget(
+      resolution.width,
+      resolution.height,
+      { type: THREE.HalfFloatType, samples: 8 }
+    );
+
+    this.composer = new EffectComposer(this.renderer, renderTarget);
+
+    // create render pass
+    var renderScene = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderScene);
+
+    // create bloom pass
+    var strength = this.data.strength;
+    var radius = this.data.radius;
+    var threshold = this.data.threshold;
+    if (this.bloomPass) {
+      this.bloomPass.dispose();
+    }
+    this.bloomPass = new UnrealBloomPass(
+      resolution,
+      strength,
+      radius,
+      threshold
+    );
+    this.composer.addPass(this.bloomPass);
+
+    // create output pass
+    if (this.outputPass) {
+      this.outputPass.dispose();
+    }
+    this.outputPass = new OutputPass();
+    this.composer.addPass(this.outputPass);
+  },
+
+  bind: function () {
+    var self = this;
+    var isInsideComposerRender = false;
+
+    this.el.renderer.render = function () {
+      if (isInsideComposerRender) {
+        self.originalRender.apply(this, arguments);
+      } else {
+        isInsideComposerRender = true;
+        self.composer.render(self.el.sceneEl.delta / 1000);
+        isInsideComposerRender = false;
+      }
+    };
+  },
+
+  remove: function () {
+    this.el.renderer.render = this.originalRender;
+    this.bloomPass.dispose();
+    this.outputPass.dispose();
+    this.composer.dispose();
   }
 });
 

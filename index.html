@@ -3,15 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <title>The Work Desk</title>
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <!-- Loaded in <head> with `defer` so custom components register before <a-scene> initializes. -->
-    <script src="js/main.js" defer></script>
+
+    <!-- A-Frame 1.7 + super-three 0.173.4 loaded as ES modules via importmap. This is the
+         A-Frame-recommended setup since 1.7's post-processing support landed — it lets
+         user-space modules import three.js postprocessing addons that share the same THREE
+         instance as A-Frame's bundled renderer. Must be the first script tag in <head>. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "aframe": "https://cdn.jsdelivr.net/npm/aframe@1.7.0/dist/aframe-master.module.min.js",
+          "three": "https://cdn.jsdelivr.net/npm/super-three@0.173.4/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/super-three@0.173.4/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="js/main.js"></script>
   </head>
 
   <body>
     <a-scene
-      renderer="colorManagement: true; physicallyCorrectLights: true"
+      renderer="colorManagement: true; toneMapping: ACESFilmic"
       shadow="type: pcfsoft"
+      bloom="threshold: 1; strength: 0.5; radius: 1"
     >
       <a-assets>
         <a-asset-item id="roomModel" src="assets/models/Room_blockoutglb.glb"></a-asset-item>
@@ -24,11 +37,19 @@
       <!-- Moon: flat-shaded white sphere placed along the same world-space ray as the directional
            light (light is at (-5, 5, 1); moon sits further out along that vector at ~3× distance)
            so the light streaming into the room visually appears to come from it. -->
+      <!-- Black base + bright emissive: bloom only catches pixels with linear values >1 (the
+           HDR threshold), and `shader: flat`/MeshBasicMaterial doesn't support emissive. Using
+           the default standard shader with color=black and emissiveIntensity>1 pushes the moon
+           into HDR range so it actually blooms, without any direct-light contribution. -->
       <a-sphere
         id="moon"
         position="-15 15 3"
         radius="1.2"
-        material="shader: flat; color: #ffffff"
+        material="color: #000000;
+                  emissive: #ffffff;
+                  emissiveIntensity: 1.5;
+                  roughness: 1;
+                  metalness: 0"
       ></a-sphere>
 
       <!-- Camera rig: WASD on the body, look-controls on the head, controllers as siblings of the head so they translate with the rig. -->
@@ -42,7 +63,7 @@
           <a-entity id="camera" camera></a-entity>
         </a-entity>
 
-        <!-- VR controllers. `laser-controls` auto-loads the right driver (Oculus Touch, Vive, WMR, etc.) and adds a raycaster. -->
+        <!-- VR controllers. `laser-controls` auto-loads the right driver per device and adds a raycaster. -->
         <a-entity id="leftHand" laser-controls="hand: left"></a-entity>
         <a-entity id="rightHand" laser-controls="hand: right"></a-entity>
       </a-entity>
@@ -51,9 +72,7 @@
            so single-layer walls cast shadows from either side. -->
       <a-entity
         gltf-model="#roomModel"
-        position="0 0 0"
         rotation="0 90 0"
-        scale="1 1 1"
         gltf-shadows
       ></a-entity>
 
@@ -63,27 +82,34 @@
            receive shadows from anything realistic anyway, so we disable receive on this model. -->
       <a-entity
         gltf-model="#lampModel"
-        position="0 0 0"
-        rotation="0 0 0"
-        scale="1 1 1"
         gltf-shadows="receive: false"
       ></a-entity>
 
-      <!-- Rice paper orb: translucent sphere with the point light at its centre.
-           `transparent` + low opacity lets the light read through the surface; `emissive` makes the
-           orb visibly glow on its own, independent of which faces the point light directly hits.
-           `side: double` renders the inside faces so the back of the sphere also shows the glow.
-           `cast: false` on the orb means it does NOT block its own point light — only the opaque
-           lamp GLB (stem + ceiling cap) casts shadows from this light. -->
+      <!-- Rice paper orb: dark warm base so direct-light reflection on its inner surface doesn't
+           saturate; emissive does the visible "lit paper" glow. `side: double` renders the inside
+           faces so the back of the sphere also shows the glow. `cast: false` on the orb means it
+           does NOT block its own point light — only the opaque lamp GLB casts shadows from it. -->
       <a-entity id="lamp-orb" position="0 2.46967 0">
         <a-sphere
           radius="0.375"
-          material="color: #ffe6c2;
+          material="color: #2a1f10;
                     emissive: #ffc488;
-                    emissiveIntensity: 0.8;
+                    emissiveIntensity: 1.5;
                     transparent: true;
-                    opacity: 0.45;
-                    side: double"
+                    opacity: 0.4;
+                    side: double;
+                    roughness: 1;
+                    metalness: 0"
+          shadow="cast: false; receive: false"
+        ></a-sphere>
+        <!-- Bulb: small emissive sphere at the point light's exact position so the orb visibly
+             contains a "source". `cast: false` keeps it out of the shadow cubemap — otherwise
+             it would block the point light's own rays from escaping. -->
+        <a-sphere
+          radius="0.1"
+          material="color: #fff2d4;
+                    emissive: #ffc488;
+                    emissiveIntensity: 3"
           shadow="cast: false; receive: false"
         ></a-sphere>
         <!-- Point-light shadows use a 6-face cubemap. shadowCameraNear/Far must be tuned to the
