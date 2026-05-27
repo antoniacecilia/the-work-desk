@@ -15,6 +15,7 @@
     >
       <a-assets>
         <a-asset-item id="roomModel" src="assets/models/Room_blockoutglb.glb"></a-asset-item>
+        <a-asset-item id="lampModel" src="assets/models/Lamp_blockoutglb.glb"></a-asset-item>
       </a-assets>
 
       <!-- Night sky — visible through the windows, sets the exterior colour for the evening mood. -->
@@ -52,6 +53,14 @@
         gltf-model="#roomModel"
         position="0 0 0"
         rotation="0 90 0"
+        scale="1 1 1"
+        gltf-shadows
+      ></a-entity>
+
+      <a-entity
+        gltf-model="#lampModel"
+        position="0 0 0"
+        rotation="0 0 0"
         scale="1 1 1"
         gltf-shadows
       ></a-entity>
