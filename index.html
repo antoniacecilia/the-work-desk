@@ -57,13 +57,56 @@
         gltf-shadows
       ></a-entity>
 
+      <!-- Lamp opts out of receiving shadows: its cap normals point up (away from the point
+           light below), so shadowNormalBias pushes cap receivers further from the light and
+           they self-shadow against their own depth in the cubemap. The lamp doesn't need to
+           receive shadows from anything realistic anyway, so we disable receive on this model. -->
       <a-entity
         gltf-model="#lampModel"
         position="0 0 0"
         rotation="0 0 0"
         scale="1 1 1"
-        gltf-shadows
+        gltf-shadows="receive: false"
       ></a-entity>
+
+      <!-- Rice paper orb: translucent sphere with the point light at its centre.
+           `transparent` + low opacity lets the light read through the surface; `emissive` makes the
+           orb visibly glow on its own, independent of which faces the point light directly hits.
+           `side: double` renders the inside faces so the back of the sphere also shows the glow.
+           `cast: false` on the orb means it does NOT block its own point light — only the opaque
+           lamp GLB (stem + ceiling cap) casts shadows from this light. -->
+      <a-entity id="lamp-orb" position="0 2.46967 0">
+        <a-sphere
+          radius="0.375"
+          material="color: #ffe6c2;
+                    emissive: #ffc488;
+                    emissiveIntensity: 0.8;
+                    transparent: true;
+                    opacity: 0.45;
+                    side: double"
+          shadow="cast: false; receive: false"
+        ></a-sphere>
+        <!-- Point-light shadows use a 6-face cubemap. shadowCameraNear/Far must be tuned to the
+             scene scale — defaults are 0.5/500, which makes depth values for nearby objects so
+             tiny that even a small shadowBias swallows the entire receiver-vs-caster depth gap
+             and the cap fails to shadow the ceiling. Near 0.1 / Far 8 keeps the relevant depths
+             in a usable range. -->
+        <a-light
+          type="point"
+          color="#ffc488"
+          intensity="4"
+          light="distance: 6;
+                 decay: 2;
+                 castShadow: true;
+                 shadowMapWidth: 1024;
+                 shadowMapHeight: 1024;
+                 shadowCameraNear: 0.1;
+                 shadowCameraFar: 8;
+                 shadowBias: -0.003;
+                 shadowRadius: 6"
+          shadow-normal-bias="0.05"
+        ></a-light>
+      </a-entity>
 
       <!-- Fill light: soft ambient so shadow interiors aren't pure black. -->
       <a-light type="ambient" color="#a7c0d9" intensity="1"></a-light>
@@ -89,39 +132,6 @@
                shadowCameraFar: 20;
                shadowBias: -0.0005"
       ></a-light>
-
-      <!-- Placeholder floor lamp: foot + pole + emissive bulb, with the point light coincident with the bulb.
-           Whole lamp is grouped under one entity so moving the parent translates everything together. -->
-      <a-entity id="floor-lamp" position="0 0 2.4">
-        <!-- Foot: short wide disc on the floor. -->
-        <a-cylinder
-          radius="0.15"
-          height="0.03"
-          position="0 0.015 0"
-          material="color: #111"
-        ></a-cylinder>
-        <!-- Pole: slim cylinder from foot to bulb. -->
-        <a-cylinder
-          radius="0.015"
-          height="1.7"
-          position="0 0.85 0"
-          material="color: #111"
-        ></a-cylinder>
-        <!-- Bulb: emissive sphere so it visually glows independent of lighting. -->
-        <a-sphere
-          radius="0.07"
-          position="0 1.7 0"
-          material="color: #ffc488; emissive: #ffc488; emissiveIntensity: 1.5"
-        ></a-sphere>
-        <!-- Point light coincident with the bulb. -->
-        <a-light
-          type="point"
-          color="#ffc488"
-          intensity="4"
-          position="0 1.7 0"
-          light="distance: 5; decay: 2"
-        ></a-light>
-      </a-entity>
     </a-scene>
   </body>
 </html>

@@ -19,20 +19,62 @@ AFRAME.registerComponent("room-bounds", {
   }
 });
 
-// Enables shadow casting/receiving on every mesh inside a loaded GLB, and forces
-// material.shadowSide = DoubleSide so single-sided ("plane-thin") walls cast shadows
-// regardless of which face the light hits — required when the model isn't manifold.
+// Enables shadow casting/receiving on every mesh inside a loaded GLB, and forces both
+// material.side and material.shadowSide to DoubleSide. The render-side flip lets us see
+// single-sided walls/lamp pieces from any angle; the shadow-side flip is what makes them
+// cast shadows regardless of which face the light hits — required when the model isn't
+// manifold and when faces' normals point away from a nearby light (e.g. the lamp cap
+// facing the ceiling while the point light sits below it).
 AFRAME.registerComponent("gltf-shadows", {
+  schema: {
+    receive: { type: "boolean", default: true }
+  },
+
   init: function () {
-    this.el.addEventListener("model-loaded", () => {
-      this.el.object3D.traverse((node) => {
-        if (!node.isMesh) return;
-        node.castShadow = true;
-        node.receiveShadow = true;
-        const mats = Array.isArray(node.material) ? node.material : [node.material];
-        mats.forEach((m) => { if (m) m.shadowSide = THREE.DoubleSide; });
+    this.el.addEventListener("model-loaded", () => this.apply());
+  },
+
+  update: function () {
+    if (this.el.getObject3D("mesh")) this.apply();
+  },
+
+  apply: function () {
+    const receive = this.data.receive;
+    this.el.object3D.traverse((node) => {
+      if (!node.isMesh) return;
+      node.castShadow = true;
+      node.receiveShadow = receive;
+      const mats = Array.isArray(node.material) ? node.material : [node.material];
+      mats.forEach((m) => {
+        if (!m) return;
+        m.side = THREE.DoubleSide;
+        m.shadowSide = THREE.DoubleSide;
+        // Force opaque: Blender sometimes exports opaque-looking materials with
+        // transparent=true, which silently disables shadow casting in three.js.
+        m.transparent = false;
+        m.opacity = 1;
       });
     });
+  }
+});
+
+// Exposes three.js' `light.shadow.normalBias` to A-Frame (the built-in `light` component
+// doesn't surface it). normalBias offsets the receiver along its surface normal before the
+// depth test, which prevents seam artifacts where the point light's shadow cubemap faces
+// meet — a stark square boundary on the ceiling otherwise appears, since PCF kernels
+// sampling across face seams produce false-positive shadow hits.
+AFRAME.registerComponent("shadow-normal-bias", {
+  schema: { default: 0.05 },
+
+  init: function () {
+    this.el.addEventListener("loaded", () => this.apply());
+  },
+
+  update: function () { this.apply(); },
+
+  apply: function () {
+    const light = this.el.components.light && this.el.components.light.light;
+    if (light && light.shadow) light.shadow.normalBias = this.data;
   }
 });
 
