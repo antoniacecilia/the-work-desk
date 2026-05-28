@@ -183,19 +183,144 @@ AFRAME.registerComponent('bloom', {
   }
 });
 
+// VR smooth locomotion: the left thumbstick translates #rig along the floor plane, in the
+// direction the headset is facing (gaze-relative, not controller-relative). Attached to the
+// hand that emits `thumbstickmoved`. Only acts in VR; desktop walking stays on wasd-controls.
+// `thumbstickmoved` fires on value change, so we cache x/y and integrate every tick — a held
+// stick keeps moving without further events until it changes or recentres.
+AFRAME.registerComponent("thumbstick-locomotion", {
+  schema: {
+    speed: { type: "number", default: 1.5 },        // metres per second
+    rig:   { type: "selector", default: "#rig" }
+  },
+
+  init: function () {
+    this.x = 0;
+    this.y = 0;
+    this._fwd   = new THREE.Vector3();
+    this._right = new THREE.Vector3();
+    this._move  = new THREE.Vector3();
+    this._up    = new THREE.Vector3(0, 1, 0);
+    this.onThumbstick = this.onThumbstick.bind(this);
+    this.el.addEventListener("thumbstickmoved", this.onThumbstick);
+  },
+
+  onThumbstick: function (evt) {
+    this.x = evt.detail.x;
+    this.y = evt.detail.y;
+  },
+
+  tick: function (time, delta) {
+    if (!this.el.sceneEl.is("vr-mode")) return;
+    if (Math.abs(this.x) < 0.05 && Math.abs(this.y) < 0.05) return;
+
+    // Gaze direction from the active (XR) camera, flattened to the horizontal plane.
+    const cam = this.el.sceneEl.camera;
+    cam.getWorldDirection(this._fwd);
+    this._fwd.y = 0;
+    if (this._fwd.lengthSq() < 1e-6) return;   // looking straight up/down: no usable heading
+    this._fwd.normalize();
+    this._right.crossVectors(this._fwd, this._up).normalize();
+
+    // Stick convention: pushing forward gives y < 0; pushing right gives x > 0.
+    this._move.set(0, 0, 0);
+    this._move.addScaledVector(this._fwd, -this.y);
+    this._move.addScaledVector(this._right, this.x);
+    if (this._move.lengthSq() > 1) this._move.normalize();  // don't let diagonals go faster
+
+    const dist = this.data.speed * (delta / 1000);
+    this.data.rig.object3D.position.addScaledVector(this._move, dist);
+  },
+
+  remove: function () {
+    this.el.removeEventListener("thumbstickmoved", this.onThumbstick);
+  }
+});
+
+// VR snap turn: the right thumbstick rotates #rig in fixed increments. Snap (vs. smooth)
+// turning is the comfort default — discrete jumps avoid the continuous peripheral motion
+// (vection) that triggers motion sickness. Debounced via `armed`: the stick must fall back
+// near centre before another snap can fire, so one flick = one turn.
+AFRAME.registerComponent("snap-turn", {
+  schema: {
+    rig:       { type: "selector", default: "#rig" },
+    angle:     { type: "number", default: 45 },
+    threshold: { type: "number", default: 0.7 },
+    reset:     { type: "number", default: 0.3 }
+  },
+
+  init: function () {
+    this.armed = true;
+    this.onThumbstick = this.onThumbstick.bind(this);
+    this.el.addEventListener("thumbstickmoved", this.onThumbstick);
+  },
+
+  onThumbstick: function (evt) {
+    if (!this.el.sceneEl.is("vr-mode")) return;
+    const x = evt.detail.x;
+    if (this.armed && Math.abs(x) > this.data.threshold) {
+      const dir = x > 0 ? -1 : 1;  // push right → clockwise → negative yaw in three.js
+      this.data.rig.object3D.rotation.y += THREE.MathUtils.degToRad(this.data.angle) * dir;
+      this.armed = false;
+    } else if (Math.abs(x) < this.data.reset) {
+      this.armed = true;
+    }
+  },
+
+  remove: function () {
+    this.el.removeEventListener("thumbstickmoved", this.onThumbstick);
+  }
+});
+
+// Pauses the named sibling components for the duration of an immersive session and restores
+// them on exit. Used to hand control to the headset: wasd-controls and look-controls are
+// desktop input methods that should not run against the live XR pose.
+AFRAME.registerComponent("pause-in-vr", {
+  schema: { type: "array" },
+
+  init: function () {
+    const scene = this.el.sceneEl;
+    this.onEnter = () => this.data.forEach((name) => {
+      const c = this.el.components[name];
+      if (c) c.pause();
+    });
+    this.onExit = () => this.data.forEach((name) => {
+      const c = this.el.components[name];
+      if (c) c.play();
+    });
+    scene.addEventListener("enter-vr", this.onEnter);
+    scene.addEventListener("exit-vr", this.onExit);
+  },
+
+  remove: function () {
+    const scene = this.el.sceneEl;
+    scene.removeEventListener("enter-vr", this.onEnter);
+    scene.removeEventListener("exit-vr", this.onExit);
+  }
+});
+
 // Solves the "double rotation" trap with nested rigs:
 // look-controls writes yaw + pitch onto #head. If we left the yaw there, the
 // child camera would rotate, but the rig body (which owns wasd-controls) would
 // keep facing its original direction — so "W" would move you sideways relative
 // to where you're looking. We transfer yaw to the rig each tick and zero it on
 // the head, keeping pitch on the head where it belongs.
+//
+// In VR this must NOT run: the headset owns head pose, and snap-turn owns rig yaw.
+// We also clear any desktop-applied head rotation on enter-vr so a stale mouse-look
+// pitch doesn't tilt the XR view.
 AFRAME.registerComponent("sync-yaw-to-rig", {
   init: function () {
     this.rigObj  = document.querySelector("#rig").object3D;
     this.headObj = this.el.object3D;
+    this.el.sceneEl.addEventListener("enter-vr", () => {
+      this.headObj.rotation.set(0, 0, 0);
+    });
   },
 
   tick: function () {
+    if (this.el.sceneEl.is("vr-mode")) return;
+
     const yaw = this.headObj.rotation.y;
 
     this.rigObj.rotation.y = yaw;

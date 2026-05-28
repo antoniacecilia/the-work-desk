@@ -58,14 +58,22 @@
         position="1 0 2"
         room-bounds="halfWidth: 2.5; halfDepth: 3; margin: 0.35"
         wasd-controls="acceleration: 5; fly: false"
+        pause-in-vr="wasd-controls"
       >
-        <a-entity id="head" position="0 1.5 0" look-controls="pointerLockEnabled: true" sync-yaw-to-rig>
+        <a-entity
+          id="head"
+          position="0 1.5 0"
+          look-controls="pointerLockEnabled: true"
+          sync-yaw-to-rig
+          pause-in-vr="look-controls"
+        >
           <a-entity id="camera" camera></a-entity>
         </a-entity>
 
-        <!-- VR controllers. `laser-controls` auto-loads the right driver per device and adds a raycaster. -->
-        <a-entity id="leftHand" laser-controls="hand: left"></a-entity>
-        <a-entity id="rightHand" laser-controls="hand: right"></a-entity>
+        <!-- VR controllers. `laser-controls` auto-loads the right driver per device and adds a raycaster.
+             Left stick = smooth gaze-relative locomotion, right stick = 45° snap turn. -->
+        <a-entity id="leftHand" laser-controls="hand: left" thumbstick-locomotion="speed: 1.5"></a-entity>
+        <a-entity id="rightHand" laser-controls="hand: right" snap-turn="angle: 45"></a-entity>
       </a-entity>
 
       <!-- Room model. `gltf-shadows` flips shadowSide to DoubleSide on every material
