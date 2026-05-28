@@ -299,6 +299,58 @@ AFRAME.registerComponent("pause-in-vr", {
   }
 });
 
+// TEMP DEBUG: a heads-up panel locked in front of the camera, reporting the VR input chain
+// so we can diagnose locomotion in-headset (no access to the Quest console). Remove once
+// movement is confirmed working. Reports: VR state, controller connection, whether thumbstick
+// events fire at all, the latest stick values, and the live rig position.
+AFRAME.registerComponent("vr-debug-hud", {
+  init: function () {
+    const bg = document.createElement("a-entity");
+    bg.setAttribute("geometry", "primitive: plane; width: 0.8; height: 0.5");
+    bg.setAttribute("material", "color: #000; opacity: 0.78; shader: flat; side: double");
+    bg.setAttribute("position", "0 0 -1");
+    const txt = document.createElement("a-entity");
+    txt.setAttribute("text", "value: starting…; align: center; width: 0.75; color: #2cff7a; baseline: center; wrapCount: 30");
+    txt.setAttribute("position", "0 0 0.01");
+    bg.appendChild(txt);
+    this.el.appendChild(bg);
+    this.txt = txt;
+
+    this.evtCount = 0;
+    this.lx = this.ly = this.rx = 0;
+    this.lConn = this.rConn = false;
+
+    const wire = (sel, isLeft) => {
+      const h = document.querySelector(sel);
+      if (!h) return;
+      h.addEventListener("thumbstickmoved", (e) => {
+        this.evtCount++;
+        if (isLeft) { this.lx = e.detail.x; this.ly = e.detail.y; }
+        else { this.rx = e.detail.x; }
+      });
+      h.addEventListener("controllerconnected", () => { isLeft ? this.lConn = true : this.rConn = true; });
+      h.addEventListener("controllerdisconnected", () => { isLeft ? this.lConn = false : this.rConn = false; });
+    };
+    wire("#leftHand", true);
+    wire("#rightHand", false);
+  },
+
+  tick: function (time) {
+    if (!this.txt) return;
+    if (time - (this._last || 0) < 200) return;
+    this._last = time;
+    const rig = document.querySelector("#rig").object3D.position;
+    this.txt.setAttribute("text", "value",
+      "vr-mode: " + this.el.sceneEl.is("vr-mode") + "\n" +
+      "ctrl L/R: " + this.lConn + " / " + this.rConn + "\n" +
+      "stick evts: " + this.evtCount + "\n" +
+      "L x/y: " + this.lx.toFixed(2) + " / " + this.ly.toFixed(2) + "\n" +
+      "R x: " + this.rx.toFixed(2) + "\n" +
+      "rig x/z: " + rig.x.toFixed(2) + " / " + rig.z.toFixed(2)
+    );
+  }
+});
+
 // Solves the "double rotation" trap with nested rigs:
 // look-controls writes yaw + pitch onto #head. If we left the yaw there, the
 // child camera would rotate, but the rig body (which owns wasd-controls) would
